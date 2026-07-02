@@ -1,0 +1,25 @@
+{
+  "name": "contact-form-reply-catcher",
+  "version": "0.1.0",
+  "tablePrefix": "rc_",
+  "description": "Polls the contact-form admin's real mailbox and threads submitter replies (and personally-sent replies) back into the Cactus contact-form inbox.",
+  "requiresModules": [
+    { "name": "contact-form", "minVersion": "0.1.0" }
+  ],
+  "permissions": [
+    "replycatcher.manage"
+  ],
+  "navEntries": [
+    { "label": "Reply Catcher", "path": "/m/contact-form-reply-catcher/settings", "icon": "<path d=\"M4 4h16v16H4z\"/><path d=\"m4 6 8 7 8-7\"/>", "permission": "replycatcher.manage" },
+    { "label": "Caught Replies", "path": "/m/contact-form-reply-catcher/inbox", "icon": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"m3 7 9 6 9-6\"/>", "permission": "replycatcher.manage" }
+  ],
+  "requiredEnvVars": [
+    { "name": "ENCRYPTION_KEY", "required": true },
+    { "name": "CRON_SECRET", "required": false }
+  ],
+  "cookieCategories": [],
+  "teardown": ["rc_mailbox_config", "rc_processed_messages", "rc_caught_replies"],
+  "cronJobs": [
+    { "path": "/api/m/contact-form-reply-catcher/cron/poll", "schedule": "0 6 * * *" }
+  ]
+}
