@@ -32,7 +32,7 @@ const EMPTY: Settings = {
   lastPollError: null,
 }
 
-export default function ReplyCatcherSettingsPage() {
+export function ReplyCatcherSettingsTab() {
   const [settings, setSettings] = useState<Settings>(EMPTY)
   const [imapPassword, setImapPassword] = useState('')
   const [oauthClientId, setOauthClientId] = useState('')
@@ -116,13 +116,10 @@ export default function ReplyCatcherSettingsPage() {
     }
   }
 
-  if (loading) return <div className="page-header"><h1 className="page-title">Reply Catcher</h1></div>
+  if (loading) return null
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Reply Catcher</h1>
-      </div>
       <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
         Polls your real mailbox once a day and threads any replies your visitors (or you, replying
         by hand) send there back into the contact-form inbox. The mailbox itself is never changed -

@@ -10,7 +10,7 @@ async function adminSettingsRedirect(request: NextRequest, query: string): Promi
   const config = await prisma.siteConfig.findUnique({ where: { id: 'singleton' }, select: { adminPath: true } })
   const adminPath = config?.adminPath ?? ''
   const res = NextResponse.redirect(
-    new URL(`/${adminPath}/m/contact-form-reply-catcher/settings?${query}`, request.url)
+    new URL(`/${adminPath}/config?tab=contact-form-reply-catcher&${query}`, request.url)
   )
   res.cookies.delete('cactus_rc_oauth_state')
   return res
