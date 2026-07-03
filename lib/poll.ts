@@ -124,6 +124,20 @@ async function processFolder(
   }
 }
 
+// ImapFlow throws a generic "Command failed" Error for any NO/BAD IMAP
+// response and puts the server's actual reason on non-standard `responseText`
+// / `executedCommand` properties instead of the message. Without this, every
+// IMAP-side failure (bad folder name, disabled capability, throttling, etc.)
+// surfaces to the admin as the same useless "Command failed" string.
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return 'Unknown error'
+  const responseText = (err as { responseText?: string }).responseText
+  const executedCommand = (err as { executedCommand?: string }).executedCommand
+  if (!responseText) return err.message
+  const command = executedCommand?.trim().split(/\s+/)[1]
+  return command ? `${err.message} (${command}): ${responseText}` : `${err.message}: ${responseText}`
+}
+
 export async function pollMailbox(): Promise<PollResult> {
   const counts = { scanned: 0, matched: 0, unmatched: 0 }
 
@@ -146,7 +160,7 @@ export async function pollMailbox(): Promise<PollResult> {
     await recordPollResult({ status: 'ok' })
     return { ok: true, ...counts }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
+    const message = describeError(err)
     try {
       if (client) await client.logout()
     } catch { /* ignore */ }
