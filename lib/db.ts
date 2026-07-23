@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { Prisma } from '@prisma/client'
 import type { MailboxConfig } from './types'
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,20 @@ export async function getMaxProcessedUid(folder: string): Promise<number | null>
     SELECT MAX("imap_uid") as max FROM "rc_processed_messages" WHERE "imap_folder" = ${folder}
   `
   return rows[0]?.max ?? null
+}
+
+// Which of the given UIDs on a folder have already been recorded in the ledger.
+// The IMAP `${maxUid+1}:*` range always re-includes the highest-UID message
+// (`*` = highest, and a range spans min..max regardless of endpoint order), so
+// the poll loop must consult this to avoid re-ingesting an already-processed
+// message on every run.
+export async function getProcessedUids(folder: string, uids: number[]): Promise<Set<number>> {
+  if (uids.length === 0) return new Set()
+  const rows = await prisma.$queryRaw<Array<{ imap_uid: number }>>`
+    SELECT "imap_uid" FROM "rc_processed_messages"
+    WHERE "imap_folder" = ${folder} AND "imap_uid" IN (${Prisma.join(uids)})
+  `
+  return new Set(rows.map((r) => r.imap_uid))
 }
 
 export async function markMessageProcessed(opts: {

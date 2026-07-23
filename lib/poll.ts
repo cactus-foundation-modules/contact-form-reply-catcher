@@ -5,6 +5,7 @@ import { connectMailbox, resolveFolders } from './imap'
 import {
   getMailboxConfig,
   getMaxProcessedUid,
+  getProcessedUids,
   markMessageProcessed,
   findRecentSubmissionsByEmail,
   insertCaughtReply,
@@ -42,8 +43,7 @@ async function findBestSubmissionMatch(email: string, replySubject: string): Pro
   return candidates[0]!.id
 }
 
-async function resolveUidRange(client: ImapFlow, folder: string): Promise<number[] | { range: string } | null> {
-  const maxUid = await getMaxProcessedUid(folder)
+async function resolveUidRange(client: ImapFlow, folder: string, maxUid: number | null): Promise<number[] | { range: string } | null> {
   if (maxUid !== null) {
     return { range: `${maxUid + 1}:*` }
   }
@@ -62,7 +62,8 @@ async function processFolder(
 ): Promise<void> {
   const lock = await client.getMailboxLock(folder)
   try {
-    const range = await resolveUidRange(client, folder)
+    const maxUid = await getMaxProcessedUid(folder)
+    const range = await resolveUidRange(client, folder, maxUid)
     if (range === null) return
 
     const fetchRange = Array.isArray(range) ? range : range.range
@@ -72,10 +73,20 @@ async function processFolder(
     // so deadlocks silently with no error and no timeout. So drain the
     // envelope-only listing fully into an array first, then issue any
     // follow-up per-message commands afterwards, once this loop has closed.
-    const messages: { uid: number; envelope: MessageEnvelopeObject | undefined }[] = []
+    const fetched: { uid: number; envelope: MessageEnvelopeObject | undefined }[] = []
     for await (const message of client.fetch(fetchRange, { uid: true, envelope: true }, { uid: true })) {
-      messages.push({ uid: message.uid, envelope: message.envelope })
+      fetched.push({ uid: message.uid, envelope: message.envelope })
     }
+
+    // Belt and braces against re-processing the same message every poll:
+    //  1. The `${maxUid+1}:*` range always re-includes the highest-UID message
+    //     (`*` = highest, and an IMAP range spans min..max whichever way round),
+    //     so drop anything not strictly greater than the last processed UID.
+    //  2. Consult the ledger and skip any (folder, uid) already recorded - covers
+    //     the first-run search() path and any gap the range check can't see.
+    const afterMax = maxUid === null ? fetched : fetched.filter((m) => m.uid > maxUid)
+    const alreadyProcessed = await getProcessedUids(folder, afterMax.map((m) => m.uid))
+    const messages = afterMax.filter((m) => !alreadyProcessed.has(m.uid))
 
     for (const { uid, envelope } of messages) {
       counts.scanned++
